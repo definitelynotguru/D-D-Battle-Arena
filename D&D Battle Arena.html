@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Turn-Based Combat</title>
+    <meta name="description" content="A simple turn-based D&D combat game with character classes and abilities">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1e40af",
+                        secondary: "#7c3aed",
+                        accent: "#059669",
+                        danger: "#dc2626",
+                        warning: "#d97706",
+                        dark: "#1f2937",
+                        light: "#f3f4f6"
+                    },
+                    fontFamily: {
+                        'fantasy': ['Cinzel', 'Georgia', 'serif'],
+                        'body': ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                        'fade-in': 'fadeIn 0.5s ease-in'
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .dice-roll {
+            animation: roll 0.5s ease-out;
+        }
+        @keyframes roll {
+            0% { transform: rotate(0deg) scale(0.8); }
+            50% { transform: rotate(180deg) scale(1.2); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .damage-taken {
+            animation: damageFlash 0.3s ease-in-out;
+        }
+        @keyframes damageFlash {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(220, 38, 38, 0.3); }
+        }
+        .heal-effect {
+            animation: healGlow 0.5s ease-in-out;
+        }
+        @keyframes healGlow {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(5, 150, 105, 0.3); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 font-body text-gray-100">
+    <header class="bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-10">
+        <nav class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                    <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                        <i class="fas fa-dice-d20 text-xl"></i>
+                    </div>
+                    <h1 class="text-2xl md:text-3xl font-bold font-fantasy">D&D Combat Arena</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="newGameBtn" class="px-4 py-2 bg-primary hover:bg-blue-700 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>New Game
+                    </button>
+                    <button id="rulesBtn" class="px-4 py-2 bg-secondary hover:bg-purple-700 rounded-lg transition-colors">
+                        <i class="fas fa-book mr-2"></i>Rules
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- Game Setup Section -->
+        <section id="setupSection" class="mb-12 animate-fade-in">
+            <div class="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                <h2 class="text-2xl font-bold font-fantasy mb-6 text-center">Choose Your Hero</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <!-- Fighter Class -->
+                    <div class="character-class bg-gray-800 rounded-lg p-6 border-2 border-gray-700 hover:border-primary transition-all cursor-pointer" data-class="fighter">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-red-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-red-700">
+                                <i class="fas fa-shield-alt text-3xl text-red-400"></i>
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">Fighter</h3>
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-heart text-red-400 mr-2"></i>
+                                <span class="text-lg font-semibold">High HP</span>
+                            </div>
+                            <p class="text-gray-300 text-center mb-4">A durable warrior skilled in melee combat with heavy armor.</p>
+                            <div class="flex flex-wrap justify-center gap-2">
+                                <span class="px-3 py-1 bg-red-900/40 rounded-full text-sm">+2 Attack</span>
+                                <span class="px-3 py-1 bg-red-900/40 rounded-full text-sm">+1 Defense</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wizard Class -->
+                    <div class="character-class bg-gray-800 rounded-lg p-6 border-2 border-gray-700 hover:border-secondary transition-all cursor-pointer" data-class="wizard">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-purple-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-purple-700">
+                                <i class="fas fa-hat-wizard text-3xl text-purple-400"></i>
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">Wizard</h3>
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-bolt text-yellow-400 mr-2"></i>
+                                <span class="text-lg font-semibold">High Damage</span>
+                            </div>
+                            <p class="text-gray-300 text-center mb-4">A master of arcane arts with powerful spells but low defense.</p>
+                            <div class="flex flex-wrap justify-center gap-2">
+                                <span class="px-3 py-1 bg-purple-900/40 rounded-full text-sm">+3 Magic</span>
+                                <span class="px-3 py-1 bg-purple-900/40 rounded-full text-sm">-1 Defense</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rogue Class -->
+                    <div class="character-class bg-gray-800 rounded-lg p-6 border-2 border-gray-700 hover:border-accent transition-all cursor-pointer" data-class="rogue">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-green-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-green-700">
+                                <i class="fas fa-user-ninja text-3xl text-green-400"></i>
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">Rogue</h3>
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-crosshairs text-green-400 mr-2"></i>
+                                <span class="text-lg font-semibold">High Crit</span>
+                            </div>
+                            <p class="text-gray-300 text-center mb-4">A stealthy assassin with high critical hit chance and evasion.</p>
+                            <div class="flex flex-wrap justify-center gap-2">
+                                <span class="px-3 py-1 bg-green-900/40 rounded-full text-sm">+2 Dexterity</span>
+                                <span class="px-3 py-1 bg-green-900/40 rounded-full text-sm">+1 Evasion</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cleric Class -->
+                    <div class="character-class bg-gray-800 rounded-lg p-6 border-2 border-gray-700 hover:border-warning transition-all cursor-pointer" data-class="cleric">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 bg-yellow-900/30 rounded-full flex items-center justify-center mb-4 border-2 border-yellow-700">
+                                <i class="fas fa-hands-praying text-3xl text-yellow-400"></i>
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">Cleric</h3>
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-hand-holding-medical text-yellow-400 mr-2"></i>
+                                <span class="text-lg font-semibold">Healing</span>
+                            </div>
+                            <p class="text-gray-300 text-center mb-4">A divine healer who can restore health and protect allies.</p>
+                            <div class="flex flex-wrap justify-center gap-2">
+                                <span class="px-3 py-1 bg-yellow-900/40 rounded-full text-sm">+2 Healing</span>
+                                <span class="px-3 py-1 bg-yellow-900/40 rounded-full text-sm">+1 Defense</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button id="startGameBtn" class="px-8 py-3 bg-accent hover:bg-green-700 rounded-lg text-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-play mr-2"></i>Start Adventure
+                    </button>
+                    <p class="text-gray-400 mt-4">Select a class to begin your journey</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Game Interface Section (Hidden Initially) -->
+        <section id="gameSection" class="hidden animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Player Stats -->
+                <div class="lg:col-span-1">
+                    <div class="bg-gray-800/50 rounded-xl p-6 border border-gray-700 h-full">
+                        <h2 class="text-2xl font-bold font-fantasy mb-6 text-center">Your Hero</h2>
+                        <div id="playerStats" class="space-y-6">
+                            <!-- Player stats will be populated here -->
+                        </div>
+                        
+                        <div class="mt-8">
+                            <h3 class="text-lg font-semibold mb-4">Combat Log</h3>
+                            <div id="combatLog" class="bg-gray-900 rounded-lg p-4 h-64 overflow-y-auto space-y-2">
+                                <!-- Combat messages will appear here -->
+                                <div class="text-gray-400 italic text-center py-8">Combat log will appear here...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Combat Arena -->
+                <div class="lg:col-span-2">
+                    <div class="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-center mb-8">
+                            <h2 class="text-2xl font-bold font-fantasy">Combat Arena</h2>
+                            <div class="flex items-center space-x-4">
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400">Round</div>
+                                    <div id="roundCounter" class="text-2xl font-bold">1</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400">Turn</div>
+                                    <div id="turnIndicator" class="text-xl font-bold text-primary">Player</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Player and Enemy Display -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            <!-- Player Character -->
+                            <div class="bg-gray-800 rounded-lg p-6 border-2 border-primary">
+                                <div class="flex flex-col items-center">
+                                    <div id="playerIcon" class="w-24 h-24 rounded-full flex items-center justify-center mb-4 border-4 border-primary">
+                                        <!-- Player icon will be set here -->
+                                    </div>
+                                    <h3 id="playerName" class="text-xl font-bold mb-2">Player</h3>
+                                    <div class="w-full mb-4">
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span>HP</span>
+                                            <span id="playerHP">100 / 100</span>
+                                        </div>
+                                        <div class="h-4 bg-gray-700 rounded-full overflow-hidden">
+                                            <div id="playerHPBar" class="h-full bg-red-500 rounded-full transition-all duration-500" style="width: 100%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-4">
+                                        <div class="text-center">
+                                            <div class="text-sm text-gray-400">AC</div>
+                                            <div id="playerAC" class="text-lg font-bold">15</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-sm text-gray-400">DMG</div>
+                                            <div id="playerDamage" class="text-lg font-bold">1d8+2</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Enemy Character -->
+                            <div class="bg-gray-800 rounded-lg p-6 border-2 border-danger">
+                                <div class="flex flex-col items-center">
+                                    <div id="enemyIcon" class="w-24 h-24 rounded-full flex items-center justify-center mb-4 border-4 border-danger">
+                                        <!-- Enemy icon will be set here -->
+                                    </div>
+                                    <h3 id="enemyName" class="text-xl font-bold mb-2">Goblin</h3>
+                                    <div class="w-full mb-4">
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span>HP</span>
+                                            <span id="enemyHP">30 / 30</span>
+                                        </div>
+                                        <div class="h-4 bg-gray-700 rounded-full overflow-hidden">
+                                            <div id="enemyHPBar" class="h-full bg-red-500 rounded-full transition-all duration-500" style="width: 100%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-4">
+                                        <div class="text-center">
+                                            <div class="text-sm text-gray-400">AC</div>
+                                            <div id="enemyAC" class="text-lg font-bold">13</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-sm text-gray-400">DMG</div>
+                                            <div id="enemyDamage" class="text-lg font-bold">1d6+1</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div id="actionButtons" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <!-- Action buttons will be populated here -->
+                        </div>
+
+                        <!-- Dice Roll Display -->
+                        <div class="bg-gray-900 rounded-lg p-6 mb-8">
+                            <h3 class="text-lg font-semibold mb-4 text-center">Dice Roll</h3>
+                            <div class="flex justify-center items-center space-x-6">
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400 mb-2">Attack Roll</div>
+                                    <div id="attackRoll" class="text-4xl font-bold font-fantasy dice-roll">-</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400 mb-2">Damage Roll</div>
+                                    <div id="damageRoll" class="text-4xl font-bold font-fantasy dice-roll">-</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-sm text-gray-400 mb-2">Total</div>
+                                    <div id="totalDamage" class="text-4xl font-bold font-fantasy">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Next Round Button -->
+                        <div class="text-center">
+                            <button id="nextTurnBtn" class="px-8 py-3 bg-primary hover:bg-blue-700 rounded-lg text-lg font-semibold transition-colors">
+                                <i class="fas fa-forward mr-2"></i>Next Turn
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Game Over Modal -->
+        <div id="gameOverModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
+            <div class="bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4 border-2 border-primary">
+                <div class="text-center">
+                    <div id="gameResultIcon" class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-4">
+                        <!-- Result icon will be set here -->
+                    </div>
+                    <h2 id="gameResultTitle" class="text-3xl font-bold font-fantasy mb-4">Game Over</h2>
+                    <p id="gameResultMessage" class="text-gray-300 mb-6">The battle has ended.</p>
+                    <div class="space-y-4">
+                        <button id="playAgainBtn" class="w-full px-6 py-3 bg-accent hover:bg-green-700 rounded-lg text-lg font-semibold transition-colors">
+                            <i class="fas fa-redo mr-2"></i>Play Again
+                        </button>
+                        <button id="changeClassBtn" class="w-full px-6 py-3 bg-secondary hover:bg-purple-700 rounded-lg text-lg font-semibold transition-colors">
+                            <i class="fas fa-user mr-2"></i>Choose Different Class
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rules Modal -->
+        <div id="rulesModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
+            <div class="bg-gray-800 rounded-xl p-8 max-w-2xl w-full mx-4 border-2 border-secondary max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold font-fantasy">Game Rules</h2>
+                    <button id="closeRulesBtn" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3">How to Play</h3>
+                        <ul class="space-y-2 text-gray-300">
+                            <li class="flex items-start">
+                                <i class="fas fa-dice-d20 text-primary mt-1 mr-3"></i>
+                                <span>Choose a character class with unique abilities and stats</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-swords text-danger mt-1 mr-3"></i>
+                                <span>Take turns attacking the enemy using your abilities</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-shield-alt text-warning mt-1 mr-3"></i>
+                                <span>Enemies will attack back on their turn</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-trophy text-accent mt-1 mr-3"></i>
+                                <span>Defeat enemies to win the game!</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3">Character Classes</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-gray-900/50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-primary mb-2">Fighter</h4>
+                                <p class="text-sm text-gray-300">High HP and defense. Basic attack deals reliable damage.</p>
+                            </div>
+                            <div class="bg-gray-900/50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-secondary mb-2">Wizard</h4>
+                                <p class="text-sm text-gray-300">Powerful magic attacks but lower defense. Can cast Fireball.</p>
+                            </div>
+                            <div class="bg-gray-900/50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-accent mb-2">Rogue</h4>
+                                <p class="text-sm text-gray-300">High critical hit chance. Can perform Sneak Attack.</p>
+                            </div>
+                            <div class="bg-gray-900/50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-warning mb-2">Cleric</h4>
+                                <p class="text-sm text-gray-300">Can heal and has decent defense. Uses Divine Smite.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3">Combat Mechanics</h3>
+                        <div class="space-y-3 text-gray-300">
+                            <p><span class="font-semibold">Attack Roll:</span> Roll 1d20 + attack bonus. Must beat enemy's AC to hit.</p>
+                            <p><span class="font-semibold">Damage Roll:</span> Roll weapon/spell dice + damage bonus.</p>
+                            <p><span class="font-semibold">Critical Hit:</span> Natural 20 on attack roll doubles damage dice.</p>
+                            <p><span class="font-semibold">Healing:</span> Restores HP. Cannot exceed maximum HP.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-semibold mb-3">Enemies</h3>
+                        <div class="space-y-2 text-gray-300">
+                            <p>You'll face different enemies with varying stats:</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li><span class="font-semibold">Goblin:</span> Weak but numerous</li>
+                                <li><span class="font-semibold">Orc:</span> Strong melee fighter</li>
+                                <li><span class="font-semibold">Skeleton:</span> Resistant to piercing damage</li>
+                                <li><span class="font-semibold">Dragon:</span> Final boss with high stats</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900/80 border-t border-gray-800 mt-12">
+        <div class="container mx-auto px-4 py-8">
+            <div class="text-center">
+                <div class="flex justify-center space-x-6 mb-4">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-discord text-xl"></i>
+                    </a>
+                </div>
+                <p class="text-gray-400">D&D Turn-Based Combat Game • Inspired by Dungeons & Dragons 5th Edition</p>
+                <p class="text-gray-500 text-sm mt-2">This is a simplified fan-made game. Dungeons & Dragons is a trademark of Wizards of the Coast.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Game Data
+        const characterClasses = {
+            "fighter": {
+                "name": "Fighter",
+                "icon": "fas fa-shield-alt",
+                "color": "red",
+                "maxHP": 120,
+                "currentHP": 120,
+                "ac": 18,
+                "attackBonus": 5,
+                "damageDice": "1d8",
+                "damageBonus": 3,
+                "abilities": [
+                    { "name": "Basic Attack", "type": "attack", "description": "Standard weapon attack", "damage": "1d8+3" },
+                    { "name": "Power Strike", "type": "attack", "description": "Heavy blow with bonus damage", "damage": "2d8+3", "cooldown": 3 },
+                    { "name": "Second Wind", "type": "heal", "description": "Heal yourself in battle", "heal": "2d6+5", "cooldown": 4 }
+                ]
+            },
+            "wizard": {
+                "name": "Wizard",
+                "icon": "fas fa-hat-wizard",
+                "color": "purple",
+                "maxHP": 80,
+                "currentHP": 80,
+                "ac": 12,
+                "attackBonus": 6,
+                "damageDice": "1d10",
+                "damageBonus": 4,
+                "abilities": [
+                    { "name": "Magic Missile", "type": "attack", "description": "Guaranteed hit magic attack", "damage": "1d4+4" },
+                    { "name": "Fireball", "type": "attack", "description": "Powerful area attack", "damage": "3d6+4", "cooldown": 4 },
+                    { "name": "Shield", "type": "buff", "description": "Temporarily increase AC", "acBonus": 5, "duration": 2, "cooldown": 3 }
+                ]
+            },
+            "rogue": {
+                "name": "Rogue",
+                "icon": "fas fa-user-ninja",
+                "color": "green",
+                "maxHP": 90,
+                "currentHP": 90,
+                "ac": 15,
+                "attackBonus": 7,
+                "damageDice": "1d6",
+                "damageBonus": 2,
+                "abilities": [
+                    { "name": "Sneak Attack", "type": "attack", "description": "Bonus damage if enemy is distracted", "damage": "2d6+2" },
+                    { "name": "Backstab", "type": "attack", "description": "High critical chance attack", "damage": "1d6+2", "critChance": 0.3, "cooldown": 3 },
+                    { "name": "Evasion", "type": "buff", "description": "Dodge next attack", "evasion": true, "cooldown": 4 }
+                ]
+            },
+            "cleric": {
+                "name": "Cleric",
+                "icon": "fas fa-hands-praying",
+                "color": "yellow",
+                "maxHP": 100,
+                "currentHP": 100,
+                "ac": 16,
+                "attackBonus": 4,
+                "damageDice": "1d8",
+                "damageBonus": 2,
+                "abilities": [
+                    { "name": "Divine Smite", "type": "attack", "description": "Holy weapon attack", "damage": "1d8+2" },
+                    { "name": "Healing Word", "type": "heal", "description": "Heal yourself or an ally", "heal": "2d4+5" },
+                    { "name": "Turn Undead", "type": "special", "description": "Extra damage vs undead", "damage": "2d8+2", "cooldown": 3 }
+                ]
+            }
+        };
+
+        const enemies = [
+            {
+                "name": "Goblin",
+                "icon": "fas fa-goblin",
+                "color": "green",
+                "maxHP": 30,
+                "currentHP": 30,
+                "ac": 13,
+                "attackBonus": 4,
+                "damageDice": "1d6",
+                "damageBonus": 1,
+                "xp": 50
+            },
+            {
+                "name": "Orc",
+                "icon": "fas fa-helmet-battle",
+                "color": "red",
+                "maxHP": 45,
+                "currentHP": 45,
+                "ac": 15,
+                "attackBonus": 5,
+                "damageDice": "1d8",
+                "damageBonus": 3,
+                "xp": 100
+            },
+            {
+                "name": "Skeleton",
+                "icon": "fas fa-skull",
+                "color": "gray",
+                "maxHP": 40,
+                "currentHP": 40,
+                "ac": 14,
+                "attackBonus": 4,
+                "damageDice": "1d6",
+                "damageBonus": 2,
+                "xp": 75
+            },
+            {
+                "name": "Dragon",
+                "icon": "fas fa-dragon",
+                "color": "red",
+                "maxHP": 100,
+                "currentHP": 100,
+                "ac": 18,
+                "attackBonus": 8,
+                "damageDice": "2d10",
+                "damageBonus": 5,
+                "xp": 250
+            }
+        ];
+
+        // Game State
+        let gameState = {
+            playerClass: null,
+            player: null,
+            enemy: null,
+            currentRound: 1,
+            playerTurn: true,
+            gameActive: false,
+            abilityCooldowns: {},
+            playerBuffs: {},
+            combatLog: [],
+            totalXP: 0,
+            enemiesDefeated: 0
+        };
+
+        // DOM Elements
+        const setupSection = document.getElementById("setupSection");
+        const gameSection = document.getElementById("gameSection");
+        const startGameBtn = document.getElementById("startGameBtn");
+        const newGameBtn = document.getElementById("newGameBtn");
+        const rulesBtn = document.getElementById("rulesBtn");
+        const closeRulesBtn = document.getElementById("closeRulesBtn");
+        const rulesModal = document.getElementById("rulesModal");
+        const gameOverModal = document.getElementById("gameOverModal");
+        const playAgainBtn = document.getElementById("playAgainBtn");
+        const changeClassBtn = document.getElementById("changeClassBtn");
+        const nextTurnBtn = document.getElementById("nextTurnBtn");
+        const characterClassesElements = document.querySelectorAll(".character-class");
+        const playerStats = document.getElementById("playerStats");
+        const combatLog = document.getElementById("combatLog");
+        const roundCounter = document.getElementById("roundCounter");
+        const turnIndicator = document.getElementById("turnIndicator");
+        const actionButtons = document.getElementById("actionButtons");
+        const attackRoll = document.getElementById("attackRoll");
+        const damageRoll = document.getElementById("damageRoll");
+        const totalDamage = document.getElementById("totalDamage");
+
+        // Initialize Game
+        function initGame() {
+            // Reset game state
+            gameState = {
+                playerClass: null,
+                player: null,
+                enemy: null,
+                currentRound: 1,
+                playerTurn: true,
+                gameActive: false,
+                abilityCooldowns: {},
+                playerBuffs: {},
+                combatLog: [],
+                totalXP: 0,
+                enemiesDefeated: 0
+            };
+
+            // Show setup section, hide game section
+            setupSection.classList.remove("hidden");
+            gameSection.classList.add("hidden");
+            gameOverModal.classList.add("hidden");
+
+            // Reset start button
+            startGameBtn.disabled = true;
+            startGameBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Adventure';
+
+            // Clear combat log
+            combatLog.innerHTML = '<div class="text-gray-400 italic text-center py-8">Combat log will appear here...</div>';
+
+            // Reset dice display
+            attackRoll.textContent = "-";
+            damageRoll.textContent = "-";
+            totalDamage.textContent = "-";
+
+            // Add event listeners to character classes
+            characterClassesElements.forEach(element => {
+                element.addEventListener("click", selectCharacterClass);
+                element.classList.remove("border-primary", "border-secondary", "border-accent", "border-warning");
+                element.classList.add("border-gray-700");
+            });
+
+            addLogMessage("Welcome to D&D Combat Arena! Choose your hero to begin.");
+        }
+
+        // Select Character Class
+        function selectCharacterClass(event) {
+            const classElement = event.currentTarget;
+            const className = classElement.dataset.class;
+            
+            // Remove selection from all classes
+            characterClassesElements.forEach(element => {
+                element.classList.remove("border-primary", "border-secondary", "border-accent", "border-warning");
+                element.classList.add("border-gray-700");
+            });
+
+            // Add selection to clicked class
+            const colorMap = {
+                "fighter": "primary",
+                "wizard": "secondary",
+                "rogue": "accent",
+                "cleric": "warning"
+            };
+            classElement.classList.remove("border-gray-700");
+            classElement.classList.add(`border-${colorMap[className]}`);
+
+            // Enable start button
+            startGameBtn.disabled = false;
+            gameState.playerClass = className;
+
+            addLogMessage(`Selected ${characterClasses[className].name} class. Ready to begin!`);
+        }
+
+        // Start Game
+        function startGame() {
+            if (!gameState.playerClass) return;
+
+            // Create player character
+            gameState.player = JSON.parse(JSON.stringify(characterClasses[gameState.playerClass]));
+            gameState.player.currentHP = gameState.player.maxHP;
+            gameState.gameActive = true;
+
+            // Generate first enemy
+            generateNewEnemy();
+
+            // Update UI
+            setupSection.classList.add("hidden");
+            gameSection.classList.remove("hidden");
+
+            // Update player display
+            updatePlayerDisplay();
+            updateEnemyDisplay();
+            updateActionButtons();
+            updatePlayerStats();
+
+            // Update round and turn
+            roundCounter.textContent = gameState.currentRound;
+            turnIndicator.textContent = "Player";
+            turnIndicator.className = "text-xl font-bold text-primary";
+
+            addLogMessage(`Game started! You are a ${gameState.player.name}.`);
+            addLogMessage(`A ${gameState.enemy.name} appears! Prepare for battle!`);
+        }
+
+        // Generate New Enemy
+        function generateNewEnemy() {
+            // For now, randomly select enemy, later can progress through them
+            const enemyIndex = Math.min(gameState.enemiesDefeated, enemies.length - 1);
+            gameState.enemy = JSON.parse(JSON.stringify(enemies[enemyIndex]));
+            gameState.enemy.currentHP = gameState.enemy.maxHP;
+        }
+
+        // Update Player Display
+        function updatePlayerDisplay() {
+            const player = gameState.player;
+            document.getElementById("playerName").textContent = player.name;
+            document.getElementById("playerHP").textContent = `${player.currentHP} / ${player.maxHP}`;
+            document.getElementById("playerHPBar").style.width = `${(player.currentHP / player.maxHP) * 100}%`;
+            document.getElementById("playerAC").textContent = player.ac + (gameState.playerBuffs.acBonus || 0);
+            document.getElementById("playerDamage").textContent = `${player.damageDice}+${player.damageBonus}`;
+            
+            const playerIcon = document.getElementById("playerIcon");
+            playerIcon.className = `w-24 h-24 rounded-full flex items-center justify-center mb-4 border-4 border-${player.color} bg-${player.color}-900/30`;
+            playerIcon.innerHTML = `<i class="${player.icon} text-4xl text-${player.color}-400"></i>`;
+        }
+
+        // Update Enemy Display
+        function updateEnemyDisplay() {
+            const enemy = gameState.enemy;
+            document.getElementById("enemyName").textContent = enemy.name;
+            document.getElementById("enemyHP").textContent = `${enemy.currentHP} / ${enemy.maxHP}`;
+            document.getElementById("enemyHPBar").style.width = `${(enemy.currentHP / enemy.maxHP) * 100}%`;
+            document.getElementById("enemyAC").textContent = enemy.ac;
+            document.getElementById("enemyDamage").textContent = `${enemy.damageDice}+${enemy.damageBonus}`;
+            
+            const enemyIcon = document.getElementById("enemyIcon");
+            enemyIcon.className = `w-24 h-24 rounded-full flex items-center justify-center mb-4 border-4 border-${enemy.color} bg-${enemy.color}-900/30`;
+            enemyIcon.innerHTML = `<i class="${enemy.icon} text-4xl text-${enemy.color}-400"></i>`;
+        }
+
+        // Update Action Buttons
+        function updateActionButtons() {
+            actionButtons.innerHTML = "";
+            const player = gameState.player;
+
+            player.abilities.forEach((ability, index) => {
+                const button = document.createElement("button");
+                button.className = `px-4 py-3 rounded-lg font-semibold transition-colors ${getAbilityButtonClass(ability.type)}`;
+                
+                // Check cooldown
+                const cooldown = gameState.abilityCooldowns[ability.name] || 0;
+                const isOnCooldown = cooldown > 0;
+                
+                if (isOnCooldown) {
+                    button.disabled = true;
+                    button.classList.add("opacity-50", "cursor-not-allowed");
+                    button.innerHTML = `
+                        <div class="text-lg">${ability.name}</div>
+                        <div class="text-sm opacity-75">Cooldown: ${cooldown}</div>
+                    `;
+                } else {
+                    button.innerHTML = `
+                        <div class="text-lg">${ability.name}</div>
+                        <div class="text-sm opacity-75">${ability.description}</div>
+                    `;
+                    button.addEventListener("click", () => useAbility(index));
+                }
+
+                actionButtons.appendChild(button);
+            });
+        }
+
+        // Get Ability Button Class
+        function getAbilityButtonClass(type) {
+            switch(type) {
+                case "attack": return "bg-danger hover:bg-red-700";
+                case "heal": return "bg-accent hover:bg-green-700";
+                case "buff": return "bg-warning hover:bg-yellow-700";
+                case "special": return "bg-secondary hover:bg-purple-700";
+                default: return "bg-gray-700 hover:bg-gray-600";
+            }
+        }
+
+        // Update Player Stats
+        function updatePlayerStats() {
+            const player = gameState.player;
+            const statsHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-heart text-red-400 mr-3 text-xl"></i>
+                            <div>
+                                <div class="text-sm text-gray-400">Health</div>
+                                <div class="text-lg font-bold">${player.currentHP}/${player.maxHP}</div>
+                            </div>
+                        </div>
+                        <div class="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-red-500 rounded-full transition-all duration-500" style="width: ${(player.currentHP / player.maxHP) * 100}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-900/50 p-4 rounded-lg">
+                            <div class="text-sm text-gray-400 mb-1">Armor Class</div>
+                            <div class="text-xl font-bold">${player.ac + (gameState.playerBuffs.acBonus || 0)}</div>
+                        </div>
+                        <div class="bg-gray-900/50 p-4 rounded-lg">
+                            <div class="text-sm text-gray-400 mb-1">Attack Bonus</div>
+                            <div class="text-xl font-bold">+${player.attackBonus}</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-400 mb-2">Active Effects</div>
+                        <div id="activeEffects" class="space-y-2">
+                            ${Object.keys(gameState.playerBuffs).length === 0 ? 
+                                '<div class="text-gray-500 italic">No active effects</div>' : 
+                                Object.entries(gameState.playerBuffs).map(([key, value]) => `
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm">${key === "acBonus" ? "Shield" : "Evasion"}</span>
+                                        <span class="text-xs bg-warning/20 text-warning px-2 py-1 rounded">${value} rounds</span>
+                                    </div>
+                                `).join("")
+                            }
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-sm text-gray-400">Enemies Defeated</div>
+                            <div class="text-lg font-bold">${gameState.enemiesDefeated}</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm text-gray-400">Total XP</div>
+                            <div class="text-lg font-bold">${gameState.totalXP}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            playerStats.innerHTML = statsHTML;
+        }
+
+        // Use Ability
+        function useAbility(abilityIndex) {
+            if (!gameState.gameActive || !gameState.playerTurn) return;
+
+            const player = gameState.player;
+            const ability = player.abilities[abilityIndex];
+            const enemy = gameState.enemy;
+
+            addLogMessage(`You use ${ability.name}!`);
+
+            // Handle different ability types
+            switch(ability.type) {
+                case "attack":
+                    performAttack(ability);
+                    break;
+                case "heal":
+                    performHeal(ability);
+                    break;
+                case "buff":
+                    applyBuff(ability);
+                    break;
+                case "special":
+                    performSpecial(ability);
+                    break;
+            }
+
+            // Set cooldown if applicable
+            if (ability.cooldown) {
+                gameState.abilityCooldowns[ability.name] = ability.cooldown;
+            }
+
+            // Update UI
+            updateActionButtons();
+            updatePlayerStats();
+
+            // Check if enemy is defeated
+            if (enemy.currentHP <= 0) {
+                enemyDefeated();
+                return;
+            }
+
+            // Switch to enemy turn
+            gameState.playerTurn = false;
+            turnIndicator.textContent = "Enemy";
+            turnIndicator.className = "text-xl font-bold text-danger";
+            
+            setTimeout(enemyTurn, 1500);
+        }
+
+        // Perform Attack
+        function performAttack(ability) {
+            const player = gameState.player;
+            const enemy = gameState.enemy;
+
+            // Roll attack (1d20 + attack bonus)
+            const attackRollValue = rollDice(20) + player.attackBonus;
+            attackRoll.textContent = attackRollValue;
+            attackRoll.classList.add("dice-roll");
+
+            // Check for critical hit
+            const isCritical = attackRollValue === 20 + player.attackBonus;
+            
+            if (isCritical) {
+                addLogMessage("Critical hit!");
+            }
+
+            // Check if attack hits
+            const enemyAC = enemy.ac;
+            if (attackRollValue >= enemyAC || isCritical) {
+                // Calculate damage
+                let damage = 0;
+                if (ability.damage) {
+                    // Parse damage dice (e.g., "2d6+3")
+                    const damageMatch = ability.damage.match(/(\d+)d(\d+)([+-]\d+)?/);
+                    if (damageMatch) {
+                        const diceCount = parseInt(damageMatch[1]);
+                        const diceSize = parseInt(damageMatch[2]);
+                        const bonus = damageMatch[3] ? parseInt(damageMatch[3]) : 0;
+                        
+                        // Roll damage dice
+                        for (let i = 0; i < diceCount; i++) {
+                            damage += rollDice(diceSize);
+                        }
+                        damage += bonus;
+                        
+                        // Double dice on critical hit
+                        if (isCritical) {
+                            for (let i = 0; i < diceCount; i++) {
+                                damage += rollDice(diceSize);
+                            }
+                        }
+                    }
+                } else {
+                    // Use default damage
+                    const damageMatch = player.damageDice.match(/(\d+)d(\d+)/);
+                    const diceCount = parseInt(damageMatch[1]);
+                    const diceSize = parseInt(damageMatch[2]);
+                    
+                    for (let i = 0; i < diceCount; i++) {
+                        damage += rollDice(diceSize);
+                    }
+                    damage += player.damageBonus;
+                    
+                    if (isCritical) {
+                        for (let i = 0; i < diceCount; i++) {
+                            damage += rollDice(diceSize);
+                        }
+                    }
+                }
+
+                damageRoll.textContent = damage;
+                damageRoll.classList.add("dice-roll");
+                totalDamage.textContent = damage;
+
+                // Apply damage
+                enemy.currentHP = Math.max(0, enemy.currentHP - damage);
+                updateEnemyDisplay();
+
+                addLogMessage(`You hit the ${enemy.name} for ${damage} damage!`);
+
+                // Visual feedback
+                const enemyElement = document.getElementById("enemyIcon").parentElement;
+                enemyElement.classList.add("damage-taken");
+                setTimeout(() => enemyElement.classList.remove("damage-taken"), 300);
+            } else {
+                damageRoll.textContent = "0";
+                totalDamage.textContent = "0";
+                addLogMessage(`You missed the ${enemy.name}!`);
+            }
+
+            // Remove dice roll animation class
+            setTimeout(() => {
+                attackRoll.classList.remove("dice-roll");
+                damageRoll.classList.remove("dice-roll");
+            }, 500);
+        }
+
+        // Perform Heal
+        function performHeal(ability) {
+            const player = gameState.player;
+
+            // Calculate heal amount
+            let healAmount = 0;
+            if (ability.heal) {
+                const healMatch = ability.heal.match(/(\d+)d(\d+)([+-]\d+)?/);
+                if (healMatch) {
+                    const diceCount = parseInt(healMatch[1]);
+                    const diceSize = parseInt(healMatch[2]);
+                    const bonus = healMatch[3] ? parseInt(healMatch[3]) : 0;
+                    
+                    for (let i = 0; i < diceCount; i++) {
+                        healAmount += rollDice(diceSize);
+                    }
+                    healAmount += bonus;
+                }
+            }
+
+            // Apply heal
+            const oldHP = player.currentHP;
+            player.currentHP = Math.min(player.maxHP, player.currentHP + healAmount);
+            const actualHeal = player.currentHP - oldHP;
+
+            // Update display
+            attackRoll.textContent = "-";
+            damageRoll.textContent = healAmount;
+            totalDamage.textContent = `+${actualHeal}`;
+            
+            attackRoll.classList.add("dice-roll");
+            damageRoll.classList.add("dice-roll");
+
+            updatePlayerDisplay();
+            addLogMessage(`You heal yourself for ${actualHeal} HP!`);
+
+            // Visual feedback
+            const playerElement = document.getElementById("playerIcon").parentElement;
+            playerElement.classList.add("heal-effect");
+            setTimeout(() => playerElement.classList.remove("heal-effect"), 500);
+
+            // Remove dice roll animation class
+            setTimeout(() => {
+                attackRoll.classList.remove("dice-roll");
+                damageRoll.classList.remove("dice-roll");
+            }, 500);
+        }
+
+        // Apply Buff
+        function applyBuff(ability) {
+            const player = gameState.player;
+
+            if (ability.acBonus) {
+                gameState.playerBuffs.acBonus = ability.acBonus;
+                gameState.playerBuffs.acBonusDuration = ability.duration;
+                addLogMessage(`Your AC increases by ${ability.acBonus} for ${ability.duration} rounds!`);
+            } else if (ability.evasion) {
+                gameState.playerBuffs.evasion = true;
+                gameState.playerBuffs.evasionDuration = ability.duration;
+                addLogMessage(`You gain evasion for ${ability.duration} rounds!`);
+            }
+
+            // Update display
+            attackRoll.textContent = "-";
+            damageRoll.textContent = "-";
+            totalDamage.textContent = "BUFF";
+            
+            attackRoll.classList.add("dice-roll");
+            setTimeout(() => attackRoll.classList.remove("dice-roll"), 500);
+        }
+
+        // Perform Special Ability
+        function performSpecial(ability) {
+            // For now, treat special as attack
+            performAttack(ability);
+        }
+
+        // Enemy Turn
+        function enemyTurn() {
+            if (!gameState.gameActive) return;
+
+            const enemy = gameState.enemy;
+            const player = gameState.player;
+
+            addLogMessage(`${enemy.name}'s turn!`);
+
+            // Check for evasion
+            if (gameState.playerBuffs.evasion) {
+                const evasionRoll = Math.random();
+                if (evasionRoll > 0.5) {
+                    addLogMessage("You evade the attack!");
+                    
+                    // Reduce evasion duration
+                    gameState.playerBuffs.evasionDuration--;
+                    if (gameState.playerBuffs.evasionDuration <= 0) {
+                        delete gameState.playerBuffs.evasion;
+                        delete gameState.playerBuffs.evasionDuration;
+                    }
+                    
+                    endEnemyTurn();
+                    return;
+                }
+            }
+
+            // Enemy attack roll
+            const attackRollValue = rollDice(20) + enemy.attackBonus;
+            const playerAC = player.ac + (gameState.playerBuffs.acBonus || 0);
+            const isCritical = attackRollValue === 20 + enemy.attackBonus;
+
+            if (attackRollValue >= playerAC || isCritical) {
+                // Calculate damage
+                let damage = 0;
+                const damageMatch = enemy.damageDice.match(/(\d+)d(\d+)/);
+                const diceCount = parseInt(damageMatch[1]);
+                const diceSize = parseInt(damageMatch[2]);
+                
+                for (let i = 0; i < diceCount; i++) {
+                    damage += rollDice(diceSize);
+                }
+                damage += enemy.damageBonus;
+                
+                if (isCritical) {
+                    addLogMessage("Critical hit from enemy!");
+                    for (let i = 0; i < diceCount; i++) {
+                        damage += rollDice(diceSize);
+                    }
+                }
+
+                // Apply damage
+                player.currentHP = Math.max(0, player.currentHP - damage);
+                updatePlayerDisplay();
+
+                addLogMessage(`${enemy.name} hits you for ${damage} damage!`);
+
+                // Visual feedback
+                const playerElement = document.getElementById("playerIcon").parentElement;
+                playerElement.classList.add("damage-taken");
+                setTimeout(() => playerElement.classList.remove("damage-taken"), 300);
+
+                // Check if player is defeated
+                if (player.currentHP <= 0) {
+                    gameOver(false);
+                    return;
+                }
+            } else {
+                addLogMessage(`${enemy.name} misses!`);
+            }
+
+            endEnemyTurn();
+        }
+
+        // End Enemy Turn
+        function endEnemyTurn() {
+            // Update buff durations
+            if (gameState.playerBuffs.acBonusDuration) {
+                gameState.playerBuffs.acBonusDuration--;
+                if (gameState.playerBuffs.acBonusDuration <= 0) {
+                    delete gameState.playerBuffs.acBonus;
+                    delete gameState.playerBuffs.acBonusDuration;
+                    addLogMessage("Shield effect wears off!");
+                }
+            }
+
+            if (gameState.playerBuffs.evasionDuration) {
+                gameState.playerBuffs.evasionDuration--;
+                if (gameState.playerBuffs.evasionDuration <= 0) {
+                    delete gameState.playerBuffs.evasion;
+                    delete gameState.playerBuffs.evasionDuration;
+                    addLogMessage("Evasion effect wears off!");
+                }
+            }
+
+            // Update cooldowns
+            Object.keys(gameState.abilityCooldowns).forEach(abilityName => {
+                gameState.abilityCooldowns[abilityName]--;
+                if (gameState.abilityCooldowns[abilityName] <= 0) {
+                    delete gameState.abilityCooldowns[abilityName];
+                }
+            });
+
+            // Switch to player turn
+            gameState.playerTurn = true;
+            turnIndicator.textContent = "Player";
+            turnIndicator.className = "text-xl font-bold text-primary";
+
+            // Update UI
+            updateActionButtons();
+            updatePlayerStats();
+
+            // Increment round
+            gameState.currentRound++;
+            roundCounter.textContent = gameState.currentRound;
+        }
+
+        // Enemy Defeated
+        function enemyDefeated() {
+            const enemy = gameState.enemy;
+            
+            gameState.totalXP += enemy.xp;
+            gameState.enemiesDefeated++;
+            
+            addLogMessage(`You defeated the ${enemy.name}! Gained ${enemy.xp} XP.`);
+            addLogMessage(`Total XP: ${gameState.totalXP}, Enemies Defeated: ${gameState.enemiesDefeated}`);
+
+            // Check for game completion
+            if (gameState.enemiesDefeated >= enemies.length) {
+                gameOver(true);
+                return;
+            }
+
+            // Generate new enemy
+            setTimeout(() => {
+                generateNewEnemy();
+                updateEnemyDisplay();
+                addLogMessage(`A new ${gameState.enemy.name} appears!`);
+                
+                // Reset turn to player
+                gameState.playerTurn = true;
+                turnIndicator.textContent = "Player";
+                turnIndicator.className = "text-xl font-bold text-primary";
+            }, 2000);
+        }
+
+        // Game Over
+        function gameOver(victory) {
+            gameState.gameActive = false;
+
+            const modal = document.getElementById("gameOverModal");
+            const icon = document.getElementById("gameResultIcon");
+            const title = document.getElementById("gameResultTitle");
+            const message = document.getElementById("gameResultMessage");
+
+            if (victory) {
+                icon.className = "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-accent bg-accent/20";
+                icon.innerHTML = '<i class="fas fa-trophy text-4xl text-accent"></i>';
+                title.textContent = "Victory!";
+                title.className = "text-3xl font-bold font-fantasy mb-4 text-accent";
+                message.textContent = `You have defeated all enemies! Final Score: ${gameState.totalXP} XP`;
+            } else {
+                icon.className = "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-danger bg-danger/20";
+                icon.innerHTML = '<i class="fas fa-skull-crossbones text-4xl text-danger"></i>';
+                title.textContent = "Defeat!";
+                title.className = "text-3xl font-bold font-fantasy mb-4 text-danger";
+                message.textContent = `You were defeated by the ${gameState.enemy.name}. You defeated ${gameState.enemiesDefeated} enemies.`;
+            }
+
+            modal.classList.remove("hidden");
+        }
+
+        // Roll Dice Utility
+        function rollDice(sides) {
+            return Math.floor(Math.random() * sides) + 1;
+        }
+
+        // Add Log Message
+        function addLogMessage(message) {
+            const logEntry = document.createElement("div");
+            logEntry.className = "text-sm py-2 border-b border-gray-800 last:border-b-0";
+            
+            const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            logEntry.innerHTML = `<span class="text-gray-500 text-xs">[${timestamp}]</span> <span class="ml-2">${message}</span>`;
+            
+            combatLog.insertBefore(logEntry, combatLog.firstChild);
+            
+            // Limit log entries
+            if (combatLog.children.length > 20) {
+                combatLog.removeChild(combatLog.lastChild);
+            }
+        }
+
+        // Next Turn Button
+        nextTurnBtn.addEventListener("click", () => {
+            if (!gameState.gameActive || gameState.playerTurn) return;
+            
+            // If it's enemy's turn, manually trigger enemy turn
+            enemyTurn();
+        });
+
+        // Event Listeners
+        startGameBtn.addEventListener("click", startGame);
+        newGameBtn.addEventListener("click", initGame);
+        rulesBtn.addEventListener("click", () => rulesModal.classList.remove("hidden"));
+        closeRulesBtn.addEventListener("click", () => rulesModal.classList.add("hidden"));
+        playAgainBtn.addEventListener("click", () => {
+            gameOverModal.classList.add("hidden");
+            initGame();
+        });
+        changeClassBtn.addEventListener("click", () => {
+            gameOverModal.classList.add("hidden");
+            initGame();
+        });
+
+        // Close modals when clicking outside
+        window.addEventListener("click", (event) => {
+            if (event.target === rulesModal) {
+                rulesModal.classList.add("hidden");
+            }
+            if (event.target === gameOverModal) {
+                gameOverModal.classList.add("hidden");
+            }
+        });
+
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>
